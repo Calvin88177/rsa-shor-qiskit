@@ -1,0 +1,396 @@
+\documentclass[11pt,a4paper]{article}
+
+% ------------------------------------------------------------------
+% Paket
+% ------------------------------------------------------------------
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{babel}
+\babelprovide[import,main]{indonesian}
+\usepackage{lmodern}
+\usepackage[margin=2.5cm]{geometry}
+\usepackage{amsmath,amssymb,amsthm}
+\usepackage{physics}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{xcolor}
+\usepackage{listings}
+\usepackage{caption}
+\usepackage{enumitem}
+\usepackage[hidelinks]{hyperref}
+
+\newtheorem{teorema}{Teorema}
+\newtheorem{definisi}{Definisi}
+\newtheorem{lema}{Lema}
+
+% Penanda bagian yang masih harus diisi
+\newcommand{\todo}[1]{\textcolor{red}{\textbf{[TODO:} #1\textbf{]}}}
+
+\lstset{
+  basicstyle=\ttfamily\small,
+  keywordstyle=\color{blue!70!black}\bfseries,
+  commentstyle=\color{green!40!black}\itshape,
+  stringstyle=\color{orange!70!black},
+  numbers=left, numberstyle=\tiny\color{gray},
+  frame=single, breaklines=true, showstringspaces=false,
+  language=Python
+}
+
+% ------------------------------------------------------------------
+\title{\textbf{Algoritma Shor dan Ancamannya terhadap Kriptosistem RSA:\\
+Analisis Teoretis dan Simulasi dengan Qiskit}}
+\author{Calvin Sabastian Tanzil (10223025)\\[2pt]
+\small Program Studi Fisika, Institut Teknologi Bandung\\
+\small FI4111 Sistem Kuantum Terbuka dan Komputasi Kuantum}
+\date{\today}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+Keamanan kriptosistem RSA bertumpu pada asumsi bahwa memfaktorkan bilangan
+bulat besar $N = pq$ tidak dapat dilakukan secara efisien oleh komputer klasik.
+Algoritma Shor menunjukkan bahwa komputer kuantum dapat menyelesaikan masalah
+tersebut dalam waktu polinomial terhadap jumlah bit $N$. Makalah ini membahas
+landasan matematis RSA, prinsip komputasi kuantum yang relevan, serta
+mekanisme dan arsitektur rangkaian algoritma Shor, kemudian
+mengimplementasikannya dalam simulator Qiskit untuk kasus RSA berukuran
+mainan. \todo{lengkapi ringkasan hasil simulasi dan kesimpulan utama setelah Bab 4 selesai.}
+
+\medskip
+\noindent\textbf{Kata kunci:} RSA, algoritma Shor, estimasi fase kuantum,
+transformasi Fourier kuantum, Qiskit.
+\end{abstract}
+
+% ==================================================================
+\section{Pendahuluan}
+% ==================================================================
+
+\subsection{Latar Belakang}
+Kriptografi kunci publik merupakan fondasi keamanan komunikasi digital modern,
+mulai dari protokol TLS pada peramban web hingga tanda tangan digital pada
+dokumen elektronik. Salah satu skema kunci publik yang paling luas digunakan
+adalah RSA, yang diperkenalkan oleh Rivest, Shamir, dan Adleman pada tahun
+1977 \cite{rsa1978}. Keamanan RSA bergantung pada sulitnya memfaktorkan
+modulus $N$ yang merupakan hasil kali dua bilangan prima besar. Algoritma
+klasik terbaik yang dikenal, yaitu \emph{General Number Field Sieve} (GNFS),
+memiliki kompleksitas subeksponensial
+\begin{equation}
+  T_{\text{GNFS}}(N) = \exp\!\left[\left(\tfrac{64}{9}\right)^{1/3}
+  (\ln N)^{1/3} (\ln\ln N)^{2/3}\,(1+o(1))\right],
+\end{equation}
+sehingga untuk ukuran kunci 2048 bit, faktorisasi secara klasik dianggap tidak
+praktis.
+
+Pada tahun 1994, Peter Shor menunjukkan bahwa sebuah komputer kuantum dapat
+memfaktorkan $N$ dalam waktu polinomial, kira-kira $O\big((\log N)^3\big)$
+operasi gerbang \cite{shor1997}. Hasil ini mengubah pemahaman tentang
+batas keamanan kriptografi kunci publik dan menjadi salah satu motivasi utama
+pengembangan komputer kuantum sekaligus kriptografi pascakuantum
+(\emph{post-quantum cryptography}) \cite{nist_pqc}. Walaupun komputer kuantum
+saat ini belum mampu menjalankan algoritma Shor pada ukuran kunci yang
+relevan, memahami cara kerja algoritma ini penting untuk menilai urgensi
+migrasi ke skema kriptografi yang tahan kuantum.
+
+\subsection{Rumusan Masalah}
+\begin{enumerate}[label=\arabic*.]
+  \item Bagaimana landasan matematis kriptosistem RSA dan mengapa keamanannya
+        bergantung pada masalah faktorisasi?
+  \item Bagaimana mekanisme dan arsitektur rangkaian kuantum algoritma Shor,
+        termasuk konstruksi \emph{oracle}-nya?
+  \item Bagaimana hasil simulasi algoritma Shor menggunakan Qiskit untuk kasus
+        RSA berukuran kecil, dan apa yang dapat disimpulkan dari hasil tersebut?
+\end{enumerate}
+
+\subsection{Tujuan}
+\begin{enumerate}[label=\arabic*.]
+  \item Menjelaskan dasar teori bilangan yang melandasi RSA.
+  \item Menguraikan mekanisme algoritma Shor beserta arsitektur rangkaiannya.
+  \item Mengimplementasikan dan menganalisis simulasi algoritma Shor
+        menggunakan Qiskit.
+\end{enumerate}
+
+\subsection{Batasan Masalah}
+\todo{sesuaikan dengan scope yang kamu pilih.} Contoh batasan:
+\begin{enumerate}[label=\arabic*.]
+  \item Kasus yang disimulasikan adalah RSA berukuran mainan
+        (misalnya $N = 15$), bukan ukuran kunci yang digunakan dalam praktik.
+  \item Simulasi dijalankan pada simulator klasik (\texttt{qiskit-aer}), bukan
+        pada perangkat keras kuantum.
+  \item \todo{apakah simulasi dengan model derau (\emph{noise}) termasuk dalam cakupan?}
+  \item \todo{apakah konstruksi oracle bersifat khusus untuk $N$ tertentu atau umum?}
+\end{enumerate}
+
+\subsection{Sistematika Penulisan}
+Bab~\ref{sec:teori} memaparkan landasan teori RSA dan komputasi kuantum.
+Bab~\ref{sec:mekanisme} menguraikan mekanisme dan arsitektur algoritma Shor.
+Bab~\ref{sec:implementasi} menyajikan implementasi Qiskit beserta hasil dan
+pembahasannya. Bab~\ref{sec:kesimpulan} berisi kesimpulan dan saran.
+
+% ==================================================================
+\section{Landasan Teori}\label{sec:teori}
+% ==================================================================
+
+\subsection{Teori Bilangan untuk RSA}
+
+\begin{definisi}[Kongruensi]
+Untuk bilangan bulat $a$, $b$, dan $n > 0$, ditulis $a \equiv b \pmod n$
+jika $n \mid (a - b)$.
+\end{definisi}
+
+\begin{definisi}[Fungsi Totien Euler]
+$\varphi(n)$ adalah banyaknya bilangan bulat $1 \le k \le n$ yang memenuhi
+$\gcd(k, n) = 1$. Untuk $n = pq$ dengan $p \ne q$ prima,
+\begin{equation}
+  \varphi(pq) = (p-1)(q-1).
+\end{equation}
+\end{definisi}
+
+\begin{teorema}[Euler]
+Jika $\gcd(a, n) = 1$, maka $a^{\varphi(n)} \equiv 1 \pmod n$.
+\end{teorema}
+
+\begin{definisi}[Invers Modular]
+Jika $\gcd(e, m) = 1$, terdapat $d$ yang unik modulo $m$ sehingga
+$ed \equiv 1 \pmod m$. Nilai $d$ dapat dihitung secara efisien dengan
+algoritma Euclid yang diperluas.
+\end{definisi}
+
+\subsection{Kriptosistem RSA}
+
+\paragraph{Pembangkitan kunci.}
+\begin{enumerate}[label=\arabic*.]
+  \item Pilih dua bilangan prima berbeda $p$ dan $q$, lalu hitung $N = pq$.
+  \item Hitung $\varphi(N) = (p-1)(q-1)$.
+  \item Pilih eksponen publik $e$ dengan $1 < e < \varphi(N)$ dan
+        $\gcd(e, \varphi(N)) = 1$.
+  \item Hitung eksponen privat $d \equiv e^{-1} \pmod{\varphi(N)}$.
+\end{enumerate}
+Kunci publik adalah $(N, e)$, sedangkan kunci privat adalah $d$
+(beserta $p$ dan $q$ yang dirahasiakan).
+
+\paragraph{Enkripsi dan dekripsi.}
+Untuk pesan $m$ dengan $0 \le m < N$,
+\begin{equation}
+  c = m^e \bmod N, \qquad m = c^d \bmod N.
+\end{equation}
+
+\paragraph{Kebenaran.}
+Karena $ed = 1 + k\varphi(N)$ untuk suatu bilangan bulat $k$, untuk
+$\gcd(m, N) = 1$ berlaku
+\begin{equation}
+  c^d \equiv m^{ed} = m \cdot \big(m^{\varphi(N)}\big)^k \equiv m \pmod N
+\end{equation}
+berdasarkan teorema Euler. (Kasus $\gcd(m, N) \ne 1$ dapat dibuktikan dengan
+teorema sisa Cina.)
+
+\paragraph{Hubungan dengan faktorisasi.}
+Siapa pun yang mengetahui $p$ dan $q$ dapat menghitung $\varphi(N)$ lalu
+memperoleh $d$ dengan algoritma Euclid yang diperluas. Dengan demikian,
+kemampuan memfaktorkan $N$ secara efisien cukup untuk mematahkan RSA. Inilah
+alasan mengapa algoritma faktorisasi yang efisien, baik klasik maupun kuantum,
+merupakan ancaman langsung terhadap RSA.
+
+\subsection{Dasar Komputasi Kuantum}
+
+\subsubsection{Qubit dan Register}
+Sebuah qubit adalah sistem kuantum dua tingkat dengan keadaan umum
+\begin{equation}
+  \ket{\psi} = \alpha\ket{0} + \beta\ket{1}, \qquad |\alpha|^2 + |\beta|^2 = 1.
+\end{equation}
+Register $n$ qubit hidup dalam ruang Hilbert berdimensi $2^n$ dengan basis
+komputasi $\{\ket{x} : x = 0, 1, \dots, 2^n - 1\}$.
+
+\subsubsection{Gerbang Kuantum Dasar}
+Gerbang Hadamard menghasilkan superposisi seragam:
+\begin{equation}
+  H = \frac{1}{\sqrt 2}\begin{pmatrix} 1 & 1 \\ 1 & -1 \end{pmatrix},
+  \qquad
+  H^{\otimes n}\ket{0}^{\otimes n} = \frac{1}{\sqrt{2^n}} \sum_{x=0}^{2^n-1} \ket{x}.
+\end{equation}
+Gerbang fase $P(\phi) = \mathrm{diag}(1, e^{i\phi})$ beserta versi
+terkendalinya merupakan komponen utama transformasi Fourier kuantum.
+
+\subsubsection{Transformasi Fourier Kuantum (QFT)}
+QFT pada $n$ qubit didefinisikan sebagai
+\begin{equation}
+  \mathrm{QFT}\ket{x} = \frac{1}{\sqrt{2^n}} \sum_{k=0}^{2^n-1}
+  e^{2\pi i\, x k / 2^n} \ket{k}.
+\end{equation}
+QFT dapat diimplementasikan dengan $O(n^2)$ gerbang (Hadamard dan fase
+terkendali), jauh lebih efisien dibanding FFT klasik pada vektor berdimensi
+$2^n$ yang membutuhkan $O(n 2^n)$ operasi \cite{nielsen2010}.
+
+\subsubsection{Estimasi Fase Kuantum (QPE)}
+Misalkan $U$ adalah operator uniter dengan vektor eigen $\ket{u}$ dan nilai
+eigen $e^{2\pi i \theta}$, $\theta \in [0, 1)$. QPE menggunakan register
+penghitung berisi $t$ qubit untuk mengestimasi $\theta$:
+\begin{enumerate}[label=\arabic*.]
+  \item Siapkan $\ket{0}^{\otimes t}\ket{u}$, lalu terapkan $H^{\otimes t}$
+        pada register penghitung.
+  \item Terapkan $U^{2^j}$ terkendali oleh qubit penghitung ke-$j$, sehingga
+        diperoleh
+        \begin{equation}
+          \frac{1}{\sqrt{2^t}} \sum_{k=0}^{2^t-1} e^{2\pi i \theta k}\ket{k}\ket{u}.
+        \end{equation}
+  \item Terapkan $\mathrm{QFT}^\dagger$ pada register penghitung, lalu ukur.
+\end{enumerate}
+Hasil pengukuran $\tilde y$ memberikan estimasi $\theta \approx \tilde y / 2^t$.
+Jika $\theta\, 2^t$ adalah bilangan bulat, estimasinya eksak; jika tidak,
+peluang memperoleh aproksimasi terbaik sedikitnya $4/\pi^2 \approx 0{,}405$
+\cite{nielsen2010}.
+
+\subsection{Algoritma Shor secara Garis Besar}
+Algoritma Shor memadukan bagian klasik dan bagian kuantum. Bagian kuantumnya
+adalah penerapan QPE untuk mencari \emph{orde} suatu bilangan modulo $N$,
+sedangkan bagian klasiknya mengubah orde tersebut menjadi faktor $N$ melalui
+perhitungan FPB (faktor persekutuan terbesar). Rincian mekanisme dan
+arsitekturnya dibahas pada Bab~\ref{sec:mekanisme}.
+
+\subsection{Qiskit}
+Qiskit adalah \emph{software development kit} sumber terbuka untuk komputasi
+kuantum yang dikembangkan IBM \cite{qiskit2024}. Rangkaian dibangun dengan
+kelas \texttt{QuantumCircuit}, ditranspilasi ke himpunan gerbang dasar dengan
+\texttt{transpile}, lalu dijalankan pada simulator \texttt{AerSimulator}
+dari paket \texttt{qiskit-aer} atau pada perangkat keras IBM Quantum.
+\todo{sebutkan versi Qiskit dan qiskit-aer yang dipakai.}
+
+% ==================================================================
+\section{Mekanisme dan Arsitektur Algoritma}\label{sec:mekanisme}
+% ==================================================================
+
+\todo{Bagian ini diisi sendiri.} Saran struktur:
+
+\subsection{Reduksi Faktorisasi ke Pencarian Orde}
+\todo{definisi orde $r$; syarat $r$ genap dan $a^{r/2} \not\equiv -1 \pmod N$;
+bagaimana faktor diperoleh dari FPB; peluang keberhasilan untuk $a$ acak.}
+
+\subsection{Operator Uniter dan Struktur Nilai Eigennya}
+\todo{definisi $U_a$; vektor eigen $\ket{u_s}$ dan nilai eigennya; mengapa
+$\ket{1}$ dapat dipakai sebagai keadaan awal register kerja.}
+
+\subsection{Konstruksi Oracle Eksponensiasi Modular}
+\todo{konstruksi oracle yang kamu pilih; diagram rangkaian; jumlah qubit dan
+kedalaman rangkaian.}
+
+\subsection{Arsitektur Rangkaian Lengkap}
+\todo{register penghitung dan register kerja, urutan gerbang, pengukuran.
+Sisipkan gambar rangkaian dari Qiskit:}
+% \begin{figure}[h]
+%   \centering
+%   \includegraphics[width=\textwidth]{../figures/rangkaian.pdf}
+%   \caption{Rangkaian lengkap ...}
+%   \label{fig:rangkaian}
+% \end{figure}
+
+\subsection{Pascaproses Klasik: Pecahan Berlanjut}
+\todo{dari hasil ukur ke estimasi fase, lalu ke orde $r$.}
+
+% ==================================================================
+\section{Implementasi Qiskit, Simulasi, dan Pembahasan}\label{sec:implementasi}
+% ==================================================================
+
+\subsection{Lingkungan Simulasi}
+\todo{versi Python, Qiskit, qiskit-aer; jumlah \emph{shots}; \emph{seed}.}
+
+\subsection{Parameter RSA yang Digunakan}
+\todo{isi tabel sesuai parameter yang kamu pakai.}
+\begin{table}[h]
+  \centering
+  \caption{Parameter RSA mainan.}
+  \label{tab:rsa}
+  \begin{tabular}{lc}
+    \toprule
+    Besaran & Nilai \\
+    \midrule
+    $p, q$        & \todo{} \\
+    $N$           & \todo{} \\
+    $\varphi(N)$  & \todo{} \\
+    $e$           & \todo{} \\
+    $d$           & \todo{} \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\subsection{Implementasi Rangkaian}
+\todo{cuplikan kode penting. Contoh memasukkan kode dari berkas:}
+% \lstinputlisting[firstline=1,lastline=40,caption={...}]{../src/nama_berkas.py}
+
+\subsection{Hasil Simulasi}
+\todo{histogram hasil pengukuran, tabel fase terukur dan orde kandidat.}
+% \begin{figure}[h]
+%   \centering
+%   \includegraphics[width=0.8\textwidth]{../figures/histogram.pdf}
+%   \caption{Distribusi hasil pengukuran register penghitung.}
+%   \label{fig:hist}
+% \end{figure}
+
+\subsection{Pembahasan}
+\todo{interpretasi puncak histogram; keberhasilan per pilihan basis;
+sumber kegagalan; kedalaman rangkaian setelah transpilasi; perbandingan
+dengan derau (jika dalam cakupan).}
+
+\subsection{Implikasi terhadap Keamanan RSA}
+Estimasi sumber daya terbaru menunjukkan bahwa mematahkan RSA-2048 dengan
+algoritma Shor membutuhkan komputer kuantum dengan koreksi galat berskala
+sangat besar, jauh melampaui kemampuan perangkat saat ini
+\cite{gidney2025}. \todo{verifikasi angka terbaru dari literatur dan
+kaitkan dengan hasil simulasimu.} Meskipun demikian, ancaman
+\emph{harvest now, decrypt later} membuat migrasi ke kriptografi
+pascakuantum, seperti standar ML-KEM dan ML-DSA dari NIST \cite{nist_pqc},
+menjadi agenda yang mendesak.
+
+% ==================================================================
+\section{Kesimpulan}\label{sec:kesimpulan}
+% ==================================================================
+
+\subsection{Kesimpulan}
+\begin{enumerate}[label=\arabic*.]
+  \item Keamanan RSA bergantung pada sulitnya faktorisasi $N = pq$; dengan
+        mengetahui $p$ dan $q$, kunci privat $d$ dapat dihitung secara
+        efisien.
+  \item \todo{kesimpulan tentang mekanisme dan arsitektur algoritma Shor.}
+  \item \todo{kesimpulan dari hasil simulasi Qiskit.}
+\end{enumerate}
+
+\subsection{Saran}
+\todo{misalnya: simulasi untuk $N$ yang lebih besar, eksekusi pada perangkat
+keras IBM Quantum, kajian mitigasi galat, atau perbandingan dengan
+kriptografi pascakuantum.}
+
+% ==================================================================
+\begin{thebibliography}{9}
+
+\bibitem{rsa1978}
+R.~L. Rivest, A.~Shamir, dan L.~Adleman,
+``A method for obtaining digital signatures and public-key cryptosystems,''
+\emph{Communications of the ACM}, vol.~21, no.~2, pp.~120--126, 1978.
+
+\bibitem{shor1997}
+P.~W. Shor,
+``Polynomial-time algorithms for prime factorization and discrete logarithms
+on a quantum computer,''
+\emph{SIAM Journal on Computing}, vol.~26, no.~5, pp.~1484--1509, 1997.
+
+\bibitem{nielsen2010}
+M.~A. Nielsen dan I.~L. Chuang,
+\emph{Quantum Computation and Quantum Information}, edisi ke-10.
+Cambridge University Press, 2010.
+
+\bibitem{qiskit2024}
+A.~Javadi-Abhari \emph{et al.},
+``Quantum computing with Qiskit,'' arXiv:2405.08810, 2024.
+
+\bibitem{gidney2025}
+C.~Gidney,
+``How to factor 2048 bit RSA integers with less than a million noisy qubits,''
+arXiv:2505.15917, 2025.
+
+\bibitem{nist_pqc}
+National Institute of Standards and Technology,
+\emph{FIPS 203: Module-Lattice-Based Key-Encapsulation Mechanism Standard},
+2024.
+
+\end{thebibliography}
+
+\end{document}
