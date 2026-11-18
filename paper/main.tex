@@ -54,8 +54,8 @@ Algoritma Shor menunjukkan bahwa komputer kuantum dapat menyelesaikan masalah
 tersebut dalam waktu polinomial terhadap jumlah bit $N$. Makalah ini membahas
 landasan matematis RSA, prinsip komputasi kuantum yang relevan, serta
 mekanisme dan arsitektur rangkaian algoritma Shor, kemudian
-mengimplementasikannya dalam simulator Qiskit untuk kasus RSA berukuran
-mainan. \todo{lengkapi ringkasan hasil simulasi dan kesimpulan utama setelah Bab 4 selesai.}
+mengimplementasikannya dalam simulator Qiskit untuk kasus RSA
+\emph{toy-sized}. \todo{lengkapi ringkasan hasil simulasi dan kesimpulan utama setelah Bab 4 selesai.}
 
 \medskip
 \noindent\textbf{Kata kunci:} RSA, algoritma Shor, estimasi fase kuantum,
@@ -84,7 +84,7 @@ praktis.
 
 Pada tahun 1994, Peter Shor menunjukkan bahwa sebuah komputer kuantum dapat
 memfaktorkan $N$ dalam waktu polinomial, kira-kira $O\big((\log N)^3\big)$
-operasi gerbang \cite{shor1997}. Hasil ini mengubah pemahaman tentang
+operasi gate \cite{shor1997}. Hasil ini mengubah pemahaman tentang
 batas keamanan kriptografi kunci publik dan menjadi salah satu motivasi utama
 pengembangan komputer kuantum sekaligus kriptografi pascakuantum
 (\emph{post-quantum cryptography}) \cite{nist_pqc}. Walaupun komputer kuantum
@@ -113,7 +113,7 @@ migrasi ke skema kriptografi yang tahan kuantum.
 \subsection{Batasan Masalah}
 \todo{sesuaikan dengan scope yang kamu pilih.} Contoh batasan:
 \begin{enumerate}[label=\arabic*.]
-  \item Kasus yang disimulasikan adalah RSA berukuran mainan
+  \item Kasus yang disimulasikan adalah RSA \emph{toy-sized}
         (misalnya $N = 15$), bukan ukuran kunci yang digunakan dalam praktik.
   \item Simulasi dijalankan pada simulator klasik (\texttt{qiskit-aer}), bukan
         pada perangkat keras kuantum.
@@ -138,7 +138,7 @@ Untuk bilangan bulat $a$, $b$, dan $n > 0$, ditulis $a \equiv b \pmod n$
 jika $n \mid (a - b)$.
 \end{definisi}
 
-\begin{definisi}[Fungsi Totien Euler]
+\begin{definisi}[\emph{Euler Totient Function}]
 $\varphi(n)$ adalah banyaknya bilangan bulat $1 \le k \le n$ yang memenuhi
 $\gcd(k, n) = 1$. Untuk $n = pq$ dengan $p \ne q$ prima,
 \begin{equation}
@@ -182,7 +182,7 @@ $\gcd(m, N) = 1$ berlaku
   c^d \equiv m^{ed} = m \cdot \big(m^{\varphi(N)}\big)^k \equiv m \pmod N
 \end{equation}
 berdasarkan teorema Euler. (Kasus $\gcd(m, N) \ne 1$ dapat dibuktikan dengan
-teorema sisa Cina.)
+\emph{Chinese Remainder Theorem}.)
 
 \paragraph{Hubungan dengan faktorisasi.}
 Siapa pun yang mengetahui $p$ dan $q$ dapat menghitung $\varphi(N)$ lalu
@@ -297,7 +297,7 @@ Sisipkan gambar rangkaian dari Qiskit:}
 \todo{isi tabel sesuai parameter yang kamu pakai.}
 \begin{table}[h]
   \centering
-  \caption{Parameter RSA mainan.}
+  \caption{Parameter RSA \emph{toy-sized}.}
   \label{tab:rsa}
   \begin{tabular}{lc}
     \toprule
